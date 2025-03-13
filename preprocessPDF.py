@@ -1,14 +1,10 @@
 import PyPDF2
 import os
 import io
-import numpy as np
+import pytesseract
 from PIL import Image
-from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 
 def extract_text_from_pdf(pdf_path):
-    """
-    Extrait le texte d'un fichier PDF.
-    """
     text = ""
     with open(pdf_path, "rb") as file:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -18,14 +14,11 @@ def extract_text_from_pdf(pdf_path):
                 for image_file_object in page.images:
                     image_data = image_file_object.data
                     try:
-                        image = Image.open(io.BytesIO(image_data))
-                        # Conversion en RGB pour s'assurer que l'image a trois canaux
-                        if image.mode != "RGB":
-                            image = image.convert("RGB")
+                        image = Image.open(io.BytesIO(image_data))     
                     except Exception as e:
                         print(f"Erreur lors du décodage de l'image: {e}")
                         continue
-                    caption = image_to_string(image)
+                    caption = pytesseract.image_to_string(image)
                     if caption is not None:
                         text += caption + "\n"
                     else:
@@ -35,27 +28,6 @@ def extract_text_from_pdf(pdf_path):
             if page_text:
                 text += page_text + "\n"
     return text
-
-def image_to_string(image):
-    """
-    Génère une transcription textuelle de l'image à l'aide du modèle TrOCR.
-    Retourne toujours une chaîne de caractères (même vide en cas d'échec).
-    """
-    try:
-        # Charger le processor et le modèle
-        processor = TrOCRProcessor.from_pretrained('microsoft/trocr-base-handwritten')
-        model = VisionEncoderDecoderModel.from_pretrained('microsoft/trocr-base-handwritten')
-        
-        pixel_values = processor(images=image, return_tensors="pt").pixel_values
-        generated_ids = model.generate(pixel_values)
-        decoded = processor.batch_decode(generated_ids, skip_special_tokens=True)
-        if decoded and len(decoded) > 0:
-            return decoded[0]
-        else:
-            return ""
-    except Exception as e:
-        print(f"Erreur lors de la génération du texte depuis l'image : {e}")
-        return ""
 
 def split_text(text, chunk_size=500, overlap=100):
     """

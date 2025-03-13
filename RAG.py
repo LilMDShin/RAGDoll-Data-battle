@@ -1,85 +1,65 @@
+import os
+import json
 import faiss
-import numpy as np
 import torch
+import numpy as np
 from sentence_transformers import SentenceTransformer
 from transformers import pipeline
-from preprocessPDF import preprocess_pdf
 
-def build_index(chunks, embedding_model):
+def load_index_and_chunks(save_folder):
     """
-    Calcule les embeddings des morceaux et construit un index FAISS.
+    Charge l'index FAISS et les chunks sauvegardés.
     """
-    # Calcul des embeddings
-    embeddings = embedding_model.encode(chunks, show_progress_bar=True)
-    embeddings = np.array(embeddings).astype("float32")
+    index_path = os.path.join(save_folder, "faiss_index.index")
+    chunks_path = os.path.join(save_folder, "chunks.json")
     
-    # Création de l'index FAISS (IndexFlatL2 pour la distance euclidienne)
-    dim = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dim)
-    index.add(embeddings)
-    return index, embeddings
+    index = faiss.read_index(index_path)
+    with open(chunks_path, "r", encoding="utf-8") as f:
+        chunks = json.load(f)
+    return index, chunks
 
 def retrieve_chunks(query, index, chunks, embedding_model, k=5):
     """
-    Recherche les k morceaux les plus pertinents par rapport à la requête.
+    Recherche les k chunks les plus pertinents pour une requête donnée.
     """
     query_embedding = embedding_model.encode([query])
     query_embedding = np.array(query_embedding).astype("float32")
     distances, indices = index.search(query_embedding, k)
-    # Récupérer les morceaux correspondants
     retrieved = [chunks[i] for i in indices[0]]
     return retrieved
 
-def generate_answer(query, retrieved_chunks, generator):
-    """
-    Construit un prompt en combinant le contexte récupéré et la requête,
-    puis utilise le générateur pour produire une réponse.
-    """
-    context = " ".join(retrieved_chunks)
-    prompt = f"Contexte: {context}\n\nRépondez en français a partir du context a cette question: {query}\n\nRéponse:"
-    generated = generator(prompt, max_new_tokens=200, num_return_sequences=1)
-    return generated[0]['generated_text']
-
-#TODO: Add IA for Images To Text https://huggingface.co/models?pipeline_tag=image-to-text&sort=trending
-
 if __name__ == "__main__":
-    # Dossier contenant les fichiers PDF
-    pdf_folder = "data"  # Assurez-vous que ce dossier existe et contient vos PDF
-    all_chunks = []
+    save_folder = "saved_index"
+    print("Chargement de l'index FAISS et des chunks sauvegardés...")
+    index, chunks = load_index_and_chunks(save_folder)
     
-    # Chargement du modèle d'embeddings
     print("Chargement du modèle d'embeddings...")
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
     
-    all_chunks = preprocess_pdf(pdf_folder, all_chunks)
-    
-    # Construction de l'index FAISS avec tous les morceaux extraits
-    print("Construction de l'index FAISS...")
-    index, _ = build_index(all_chunks, embedding_model)
-    
-    # Chargement du générateur de texte (ici GPT-2)
-    print("Chargement du générateur de texte...")
-    model_id = "meta-llama/Llama-3.2-3B-Instruct"
-    generator = pipe = pipeline(
-    "text-generation",
-        model=model_id,
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
-    )   
-    
-    # Exemple de requête
-    query = "Quel est le contenu principal des documents ?"
+    query = input("Entrez votre requête : ")
     print(f"Requête : {query}")
     
-    # Récupération des morceaux les plus pertinents
-    retrieved_chunks = retrieve_chunks(query, index, all_chunks, embedding_model)
+    print("Recherche des chunks pertinents...")
+    retrieved_chunks = retrieve_chunks(query, index, chunks, embedding_model)
     
-    # Génération de la réponse en se basant sur le contexte récupéré
-    answer = generate_answer(query, retrieved_chunks, generator)
-    with open("reponse_generée.txt", "w", encoding="utf-8") as f:
-        f.write(answer)
-    print("La réponse générée a été sauvegardée dans le fichier 'reponse_generée.txt'")
-
+    # Affichage des chunks récupérés avec leurs métadonnées
+    print("\nChunks récupérés :")
+    for chunk in retrieved_chunks:
+        print(f"[PDF: {chunk['pdf']} - Page: {chunk['page']}]")
+        print(chunk['text'])
+        print("-" * 50)
     
+    # Vous pouvez ensuite construire un prompt et générer une réponse via votre générateur de texte dans ce fichier séparé.
+    # Par exemple, décommentez et adaptez le code suivant :
+    #
+    generator = pipeline(
+        "text-generation",
+        model="meta-llama/Llama-3.2-3B-Instruct",
+        torch_dtype=torch.bfloat16,
+        device_map="auto",
+    )
+    context = "\n".join([f"[PDF: {chunk['pdf']} - Page: {chunk['page']}] {chunk['text']}" for chunk in retrieved_chunks])
+    prompt = f"Contexte:\n{context}\n\nRépondez en français à la question suivante : {query}\n\nRéponse:"
+    generated = generator(prompt, max_new_tokens=200, num_return_sequences=1)
     print("\nRéponse générée :")
-    print(answer)
+    print(generated[0]['generated_text'])

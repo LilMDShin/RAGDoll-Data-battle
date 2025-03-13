@@ -18,6 +18,7 @@ packaging==24.2
 pillow==11.0.0
 psutil==7.0.0
 PyPDF2==3.0.1
+pytesseract==0.3.13
 PyYAML==6.0.2
 regex==2024.11.6
 requests==2.32.3

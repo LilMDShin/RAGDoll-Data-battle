@@ -1,2 +1,10 @@
 reponse_generée.txt
-data/*
+
+# Virtualenv
+.venv/
+
+# Python cache
+__pycache__
+
+# data
+data/

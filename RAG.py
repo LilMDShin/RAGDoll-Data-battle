@@ -51,7 +51,7 @@ if __name__ == "__main__":
     
     # Vous pouvez ensuite construire un prompt et générer une réponse via votre générateur de texte dans ce fichier séparé.
     # Par exemple, décommentez et adaptez le code suivant :
-    #
+    
     generator = pipeline(
         "text-generation",
         model="meta-llama/Llama-3.2-3B-Instruct",

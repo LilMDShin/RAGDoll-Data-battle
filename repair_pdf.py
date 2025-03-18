@@ -7,9 +7,9 @@ def repair_pdf_file(filepath : str):
 
 if __name__ == "__main__":
     data_folder = os.path.join("data")
-    for root, dirs, files in os.walk(data_folder, topdown=False):
-        for name in files:
-           filepath = os.path.join(root, name)
+    for root, _, files in os.walk(data_folder, topdown=False):
+        for filename in files:
+           filepath = os.path.join(root, filename)
            if filepath.lower().endswith(".pdf"):
-               print(f"Traitement de : {filepath}")
+               print(f"Traitement de : {filename}")
                repair_pdf_file(filepath)

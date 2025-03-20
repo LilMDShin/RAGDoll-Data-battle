@@ -69,4 +69,8 @@ if __name__ == "__main__":
     save_folder = "json_output"  # Dossier de sauvegarde des fichiers JSON
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
-    process_pdf_and_save_json(pdf_folder, save_folder)
+    for root, dirs, files in os.walk(pdf_folder, topdown=False):
+        for dir in dirs:
+            dirpath = os.path.join(root, dir)
+            process_pdf_and_save_json(dirpath, save_folder)
+    # process_pdf_and_save_json(pdf_folder, save_folder)

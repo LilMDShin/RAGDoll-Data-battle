@@ -56,7 +56,7 @@ if __name__ == "__main__":
     
     context = "\n".join([f"[PDF: {chunk['pdf']} - Page: {chunk['page']}] {chunk['text']}" for chunk in retrieved_chunks])
 
-    system_prompt = "You are an expert in patent laws. You provide both detailed answers and your source (include the name of the source document)."
+    system_prompt = "You are an expert in patent laws and specialized in making MCQs. You provide both detailed answers and your source after the user answers (include the name of the source document)."
 
     client = InferenceClient(
         provider="nebius",

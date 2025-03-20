@@ -12,3 +12,6 @@ data/
 saved_index/
 
 json_output/
+
+# Local env
+.env

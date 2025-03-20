@@ -65,7 +65,9 @@ if __name__ == "__main__":
     print(f"Nombre de chunks créés: {len(all_chunks)}")
 
     print("Chargement du modèle d'embeddings...")
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    # embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+    embedding_model = SentenceTransformer('all-MiniLM-L12-v2')
 
     print("Construction de l'index FAISS...")
     index = build_index(all_chunks, embedding_model)

@@ -6,3 +6,9 @@ Data battle 2025
     sudo apt-get update
     sudo apt-get install tesseract-ocr
 ```
+
+### Ghostscript 
+```bash
+    sudo apt-get update
+    sudo apt-get install ghostscript
+```

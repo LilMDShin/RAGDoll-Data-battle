@@ -1,32 +1,20 @@
-import os
-import json
-import faiss
-import numpy as np
 from sentence_transformers import SentenceTransformer
 from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
+from utils_chunks import load_index_and_chunks
+from utils_chunks import retrieve_chunks
 
-def load_index_and_chunks(save_folder):
-    """
-    Charge l'index FAISS et les chunks sauvegardés.
-    """
-    index_path = os.path.join(save_folder, "faiss_index.index")
-    chunks_path = os.path.join(save_folder, "chunks.json")
-    
-    index = faiss.read_index(index_path)
-    with open(chunks_path, "r", encoding="utf-8") as f:
-        chunks = json.load(f)
-    return index, chunks
-
-def retrieve_chunks(query, index, chunks, embedding_model, k=5):
-    """
-    Recherche les k chunks les plus pertinents pour une requête donnée.
-    """
-    query_embedding = embedding_model.encode([query])
-    query_embedding = np.array(query_embedding).astype("float32")
-    distances, indices = index.search(query_embedding, k)
-    retrieved = [chunks[i] for i in indices[0]]
-    return retrieved
+def RAG_conv(model_id, client_inference, conv_history):
+    completion = client_inference.chat.completions.create(
+        model=model_id,
+        messages=conv_history,
+        max_tokens=550,
+        temperature=0,
+        # top_p=1
+        top_p=0.99
+    )
+    model_res = completion.choices[0].message.content
+    return(model_res)
 
 if __name__ == "__main__":
     # load environment variables from .env file
@@ -59,8 +47,9 @@ if __name__ == "__main__":
     system_prompt = "You are an expert in patent laws and specialized in making MCQs. You provide both detailed answers and your source after the user answers (include the name of the source document)."
 
     client = InferenceClient(
-        provider="nebius",
-        api_key=os.environ.get("API_KEY"),
+        # provider="hf-inference",
+        provider="novita",
+        # token = os.environ.get("API_KEY"),
     )
 
     conv_history = [
@@ -73,16 +62,12 @@ if __name__ == "__main__":
                 "content": query
             }
         ]
+    
+    # To test
+    # model_id = "mistralai/Mistral-7B-Instruct-v0.3"
+    model_id = "meta-llama/Llama-3.2-3B-Instruct"
 
-    completion = client.chat.completions.create(
-        model="meta-llama/Llama-3.2-3B-Instruct",
-        messages=conv_history,
-        max_tokens=500,
-        temperature=0,
-        top_p=1
-    )
-
-    model_res = completion.choices[0].message.content
+    model_res = RAG_conv(model_id, client, conv_history)
 
     print(model_res)
 
@@ -104,16 +89,11 @@ if __name__ == "__main__":
             "role": "user",
             "content": query
         })
-        completion = client.chat.completions.create(
-            model="meta-llama/Llama-3.2-3B-Instruct",
-            messages=conv_history,
-            max_tokens=500,
-            temperature=0,
-            top_p=1
-        )
-        model_res = completion.choices[0].message.content
-        print("\nRéponse générée :")
+
+        model_res = RAG_conv(model_id, client, conv_history)
+
         print(model_res)
+
         user_res = input("Continuer ? 1 pour oui, 0 pour non : ")
         if (user_res.isdigit()):
             user_val = int(user_res)

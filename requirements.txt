@@ -29,7 +29,7 @@ opencv-python-headless==4.11.0.86
 packaging==24.2
 pandas==2.2.3
 pikepdf==9.5.2
-pillow==11.0.0
+pillow==11.1.0
 protobuf==5.29.3
 psutil==7.0.0
 pyarrow==19.0.1
@@ -58,7 +58,7 @@ tenacity==9.0.0
 threadpoolctl==3.5.0
 tokenizers==0.21.0
 toml==0.10.2
-torch==2.6.0+cpu
+torch==2.6.0
 torchaudio==2.6.0+cpu
 torchvision==0.21.0+cpu
 tornado==6.4.2
@@ -69,3 +69,6 @@ tzdata==2025.1
 urllib3==2.3.0
 watchdog==6.0.0
 wrapt==1.17.2
+
+openpyxl==3.2.0b1
+ghostscript==0.7

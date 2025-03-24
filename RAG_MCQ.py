@@ -95,7 +95,7 @@ if __name__ == "__main__":
         print(model_res)
 
         user_res = input("Continuer ? 1 pour oui, 0 pour non : ")
-        if (user_res.isdigit()):
+        if user_res.isdigit():
             user_val = int(user_res)
         else:
             user_val = 0

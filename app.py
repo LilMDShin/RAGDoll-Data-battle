@@ -4,7 +4,10 @@ import streamlit as st
 from utils_chunks import load_index_and_chunks
 from utils_chunks import retrieve_chunks
 from RAG_open_quests import RAG_conv
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 # First thing to call
 st.set_page_config(page_title="RAG Model", layout="wide")
 
@@ -22,17 +25,17 @@ def load_chunks():
         "index": index,
         "chunks": chunks
     }
-    return(dict_chunks)
+    return dict_chunks
 
 @st.cache_resource
 def client_for_inference():
     client_inference = InferenceClient(
-        provider="novita"
+        provider="novita",
         # provider="hf-inference"
         # provider="nebius",
-        # token = os.environ.get("API_KEY")
+        token = os.environ.get("API_KEY")
     )
-    return(client_inference)
+    return client_inference
 
 # This is for the RAG for open questions
 def rag_model(model_id, client_inference, query, dict_chunks): # , embedding_model, ):
@@ -44,7 +47,7 @@ def rag_model(model_id, client_inference, query, dict_chunks): # , embedding_mod
     context = "\n".join([f"[PDF: {chunk['pdf']} - Page: {chunk['page']}] {chunk['text']}" for chunk in retrieved_chunks])
 
     # Define system prompt only if the conversation has just started
-    if (len(st.session_state.model_conv_history) == 0):
+    if len(st.session_state.model_conv_history) == 0:
         system_prompt = "You are an expert in patent laws. You provide both detailed answers and your source (include the name of the document)."
         st.session_state.model_conv_history.append({
             "role": "system",
@@ -72,7 +75,7 @@ def rag_model(model_id, client_inference, query, dict_chunks): # , embedding_mod
         "content": model_res
     })
 
-    return(model_res)
+    return model_res
 
 # Display conversation history
 def display_conversations():

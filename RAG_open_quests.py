@@ -14,7 +14,7 @@ def RAG_conv(model_id, client_inference, conv_history):
         top_p=0.99
     )
     model_res = completion.choices[0].message.content
-    return(model_res)
+    return model_res
 
 if __name__ == "__main__":
     # load environment variables from .env file
@@ -75,11 +75,11 @@ if __name__ == "__main__":
 
     user_res = input("Continuer ? 1 pour oui, 0 pour non : ")
 
-    if (user_res.isdigit()):
+    if user_res.isdigit():
         user_val = int(user_res)
     else:
         user_val = 0
-    while (user_val == 1):
+    while user_val == 1:
         conv_history.append({
             "role": "assistant",
             "content": model_res
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         print(model_res)
 
         user_res = input("Continuer ? 1 pour oui, 0 pour non : ")
-        if (user_res.isdigit()):
+        if user_res.isdigit():
             user_val = int(user_res)
         else:
             user_val = 0

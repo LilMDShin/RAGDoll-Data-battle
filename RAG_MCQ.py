@@ -1,8 +1,8 @@
 from sentence_transformers import SentenceTransformer
 from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
-from utils_chunks import load_index_and_chunks
-from utils_chunks import retrieve_chunks
+from utils.chunks import load_index_and_chunks
+from utils.chunks import retrieve_chunks
 
 def RAG_conv(model_id, client_inference, conv_history):
     completion = client_inference.chat.completions.create(

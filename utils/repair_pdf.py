@@ -1,12 +1,5 @@
 import os
-from pikepdf import Pdf
 from dotenv import load_dotenv
-
-def repair_pdf_file(filepath : str):
-    with Pdf.open(filepath, allow_overwriting_input=True) as pdf:
-        pdf.save(filepath)
-
-
 import ghostscript
 
 

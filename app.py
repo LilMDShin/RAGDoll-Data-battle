@@ -3,9 +3,14 @@ from huggingface_hub import InferenceClient
 import streamlit as st
 from utils.chunks import load_index_and_chunks
 from utils.chunks import retrieve_chunks
+from utils.repair_pdf import repair_pdf
+from utils.preprocess import process_pdf_to_json, process_html_to_json
+from utils.faiss_index import update_index
 from RAG_open_quests import RAG_conv
 from dotenv import load_dotenv
 import os
+import tempfile
+import shutil
 
 # First thing to call
 st.set_page_config(page_title="RAG Model", layout="wide")
@@ -16,7 +21,7 @@ load_dotenv()
 @st.cache_resource
 def load_embedding_model():
     embedding_model = SentenceTransformer('all-MiniLM-L12-v2')
-    return(embedding_model)
+    return embedding_model
 
 @st.cache_resource
 def load_chunks():
@@ -35,12 +40,12 @@ def client_for_inference():
         provider="novita",
         # provider="hf-inference"
         # provider="nebius",
-        token = os.environ.get("API_KEY")
+        token=os.environ.get("API_KEY")
     )
     return client_inference
 
 # This is for the RAG for open questions
-def rag_model(model_id, client_inference, query, dict_chunks): # , embedding_model, ):
+def rag_model(model_id, client_inference, query, dict_chunks):
     index = dict_chunks["index"]
     chunks = dict_chunks["chunks"]
 
@@ -88,7 +93,7 @@ def rag_MCQ(model_id, client_inference, query, dict_chunks):
     context = "\n".join([f"[PDF: {chunk['pdf']} - Page: {chunk['page']}] {chunk['text']}" for chunk in retrieved_chunks])
 
     # Define system prompt only if the conversation has just started
-    if (len(st.session_state.model_conv_history) == 0):
+    if len(st.session_state.model_conv_history) == 0:
         system_prompt = "You are an expert in patent laws. You provide both detailed answers and your source (include the name of the document)."
         st.session_state.model_conv_history.append({
             "role": "system",
@@ -111,11 +116,11 @@ def rag_MCQ(model_id, client_inference, query, dict_chunks):
         "content": model_res
     })
 
-    return(model_res)
+    return model_res
 
 # For the RAG that is specialized in creating open questions and correcting user
 def rag_create_quest(model_id, client_inference, query, dict_chunks):
-    # TODO
+    # TODO: Implement functionality for creating questions
     pass
 
 # Display conversation history
@@ -152,12 +157,16 @@ def init_session_states():
     if 'input' not in st.session_state:
         st.session_state.input = ''
 
+    # Session state for file uploader toggles
+    if 'show_pdf_uploader' not in st.session_state:
+        st.session_state.show_pdf_uploader = False
+    if 'show_html_uploader' not in st.session_state:
+        st.session_state.show_html_uploader = False
+
 init_session_states()
 
 embedding_model = load_embedding_model()
-
 dict_chunks = load_chunks()
-
 client_inference = client_for_inference()
 
 st.title("Retrieval-Augmented Generation (RAG) Base")
@@ -169,27 +178,23 @@ st.write(
     """
 )
 
-if (st.session_state.RAG_type == "open_questions"):
+if st.session_state.RAG_type == "open_questions":
+    st.write("Ready to answer any questions you may have.")
+elif st.session_state.RAG_type == "MCQ":
     st.write(
         """
-        Ready to answer any questions you may have.
-        """
-    )
-elif (st.session_state.RAG_type == "MCQ"):
-    st.write(
-        """
-        Specialized in making MCQs.\n
-        First, input a subject and then answer with only the corresponding letter or number.\n
+        Specialized in making MCQs.
+        First, input a subject and then answer with only the corresponding letter or number.
         You can reset this conversation or open a new page if you want a MCQ for another subject.
         """
     )
 
 # Process input when the user submits
 if st.session_state.input:
-    # Call the RAG model
-    if (st.session_state.RAG_type == "open_questions"):
+    # Call the RAG model based on the selected type
+    if st.session_state.RAG_type == "open_questions":
         model_response = rag_model(st.session_state.model_id, client_inference, st.session_state.input, dict_chunks)
-    elif (st.session_state.RAG_type == "MCQ"):
+    elif st.session_state.RAG_type == "MCQ":
         model_response = rag_MCQ(st.session_state.model_id, client_inference, st.session_state.input, dict_chunks)
 
     # Store the conversation in session state
@@ -213,32 +218,89 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     btn1 = st.button('Reset Conversation')
-
 with col2:
     btn2 = st.button('Add pdf')
-
 with col3:
     btn3 = st.button('Add html')
 
-# Button to reset conversation
+# Button actions
 if btn1:
     reset_conv()
 
 if btn2:
-    # TODO
-    pass
+    st.session_state.show_pdf_uploader = True
 
 if btn3:
-    # TODO
-    pass
+    st.session_state.show_html_uploader = True
+
+# Display file uploaders based on session state flags
+if st.session_state.show_pdf_uploader:
+    pdf_file = st.file_uploader("Upload a PDF file", type="pdf", key="pdf_uploader")
+    if pdf_file is not None:
+        st.write("PDF file uploaded:", pdf_file.name)
+        # Save the uploaded file to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(pdf_file.read())
+            tmp_path = tmp.name
+        # Define an output path for the repaired PDF
+        output_path = os.path.join("input/pdf",pdf_file.name)
+        # Repair the PDF using the provided function
+        if not os.path.exists(output_path):
+            repair_pdf(tmp_path, output_path)
+            st.write(f"PDF repaired and saved at: {output_path}")
+            output_str, err = process_pdf_to_json(output_path, "input/json")
+            st.write(output_str)
+            if err:
+                st.error("Stop PDF processing")
+            else : 
+                st.write("Updating the FAISS index with the new data...")
+                update_index("input/json", "saved_index", embedding_model)
+                if os.path.exists("input/json"):
+                    shutil.rmtree("input/json")
+                os.makedirs("input/json")
+                load_chunks.clear()
+                dict_chunks = load_chunks()
+                st.write("FAISS index updated with the new data...")
+        else:
+            st.error(f"PDF already exists at: {output_path}")
+        st.session_state.show_pdf_uploader = False
+
+if st.session_state.show_html_uploader:
+    html_file = st.file_uploader("Upload an HTML file", type="html", key="html_uploader")
+    if html_file is not None:
+        st.write("HTML file uploaded:", html_file.name)
+        # Define the output path for the HTML file
+        output_path = os.path.join("input/html", html_file.name)
+        # Check if the file already exists
+        if not os.path.exists(output_path):
+            # Save the uploaded HTML file directly to the folder
+            with open(output_path, "wb") as f:
+                f.write(html_file.read())
+            st.write(f"HTML file saved at: {output_path}")
+            output_str, err = process_html_to_json(output_path, "input/json")
+            st.write(output_str)
+            if err:
+                st.error("Stop HTML processing")
+            else : 
+                st.write("Updating the FAISS index with the new data...")
+                update_index("input/json", "saved_index", embedding_model)
+                if os.path.exists("input/json"):
+                    shutil.rmtree("input/json")
+                os.makedirs("input/json")
+                load_chunks.clear()
+                dict_chunks = load_chunks()
+                st.write("FAISS index updated with the new data...")
+        else:
+            st.error(f"HTML file already exists at: {output_path}")
+        st.session_state.show_html_uploader = False
 
 selCol1, _ = st.columns([1, 4])
 
 with selCol1:
     RAG_option = st.selectbox(
-    label="What functionality do you need?",
-    options=list(RAG_choices.keys()),
-    index=0
+        label="What functionality do you need?",
+        options=list(RAG_choices.keys()),
+        index=0
     )
 
 if RAG_option:

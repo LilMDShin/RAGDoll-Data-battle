@@ -55,7 +55,10 @@ def rag_model(model_id, client_inference, query, dict_chunks):
 
     # Define system prompt only if the conversation has just started
     if len(st.session_state.model_conv_history) == 0:
-        system_prompt = "You are an expert in patent laws. You provide both detailed answers and your source (include the name of the document)."
+        if (st.session_state.RAG_type == "open_questions"):
+            system_prompt = "You are an expert in patent laws. You provide both detailed answers and your source (include the name of the document)."
+        elif (st.session_state.RAG_type == "create_questions"):
+            system_prompt = "You are an expert in patent laws and making questions on the subject. You provide both detailed answers and your source after the user answers (include the name of the document)."
         st.session_state.model_conv_history.append({
             "role": "system",
             "content": f"Do not show this on your response.\n{system_prompt}\nYou always answer in the same language as the query and within 500 words sources included.\nYou have access to the following context : {context}"
@@ -94,7 +97,7 @@ def rag_MCQ(model_id, client_inference, query, dict_chunks):
 
     # Define system prompt only if the conversation has just started
     if len(st.session_state.model_conv_history) == 0:
-        system_prompt = "You are an expert in patent laws. You provide both detailed answers and your source (include the name of the document)."
+        system_prompt = "You are an expert in patent laws and specialized in making multiple choice questions on the subject (one or multiple good answers). You provide both detailed answers and your source after the user answers (include the name of the document)."
         st.session_state.model_conv_history.append({
             "role": "system",
             "content": f"Do not show this on your response.\n{system_prompt}\nYou always answer in the same language as the query and within 500 words sources included.\nYou have access to the following context : {context}"
@@ -145,7 +148,8 @@ def init_session_states():
         st.session_state.model_conv_history = []
 
     if 'model_id' not in st.session_state:
-        st.session_state.model_id = "mistralai/Mistral-7B-Instruct-v0.3"
+        st.session_state.model_id = "meta-llama/Llama-3.2-3B-Instruct"
+        # st.session_state.model_id = "mistralai/Mistral-7B-Instruct-v0.3"
 
     if 'RAG_type' not in st.session_state:
         st.session_state.RAG_type = "open_questions"
@@ -174,7 +178,7 @@ st.title("Retrieval-Augmented Generation (RAG) Base")
 st.write(
     """
     This is a base Streamlit app for RAG. You can enter multiple queries 
-    and view the corresponding model responses.
+    and view the corresponding responses.
     """
 )
 
@@ -192,7 +196,7 @@ elif st.session_state.RAG_type == "MCQ":
 # Process input when the user submits
 if st.session_state.input:
     # Call the RAG model based on the selected type
-    if st.session_state.RAG_type == "open_questions":
+    if st.session_state.RAG_type == "open_questions" or st.session_state.RAG_type == "create_questions":
         model_response = rag_model(st.session_state.model_id, client_inference, st.session_state.input, dict_chunks)
     elif st.session_state.RAG_type == "MCQ":
         model_response = rag_MCQ(st.session_state.model_id, client_inference, st.session_state.input, dict_chunks)

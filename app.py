@@ -40,7 +40,7 @@ def client_for_inference():
         provider="novita",
         # provider="hf-inference"
         # provider="nebius",
-        token=os.environ.get("API_KEY")
+        # token=os.environ.get("API_KEY")
     )
     return client_inference
 
@@ -87,6 +87,7 @@ def rag_model(model_id, client_inference, query, dict_chunks):
 
     return model_res
 
+# TODO Make model put a line break between each choice
 def rag_MCQ(model_id, client_inference, query, dict_chunks):
     index = dict_chunks["index"]
     chunks = dict_chunks["chunks"]
@@ -97,7 +98,7 @@ def rag_MCQ(model_id, client_inference, query, dict_chunks):
 
     # Define system prompt only if the conversation has just started
     if len(st.session_state.model_conv_history) == 0:
-        system_prompt = "You are an expert in patent laws and specialized in making multiple choice questions on the subject (one or multiple good answers). You provide both detailed answers and your source after the user answers (include the name of the document)."
+        system_prompt = "You are an expert in patent laws and specialized in making multiple choice questions (MCQ) on the subject (one or multiple correct answers). You give at least a set of 4 each time. After the user answers, provide both detailed answers and your source (include the name of the document)."
         st.session_state.model_conv_history.append({
             "role": "system",
             "content": f"Do not show this on your response.\n{system_prompt}\nYou always answer in the same language as the query and within 500 words sources included.\nYou have access to the following context : {context}"
@@ -135,7 +136,6 @@ def reset_conv():
     st.session_state.interface_conv_history = []
     st.session_state.model_conv_history = []
     st.session_state.input = ''
-    st.rerun()  # Rerun the script to reflect changes immediately
 
 def init_session_states():
     # Session state for conversations for the model
@@ -143,8 +143,8 @@ def init_session_states():
         st.session_state.model_conv_history = []
 
     if 'model_id' not in st.session_state:
-        st.session_state.model_id = "meta-llama/Llama-3.2-3B-Instruct"
-        # st.session_state.model_id = "mistralai/Mistral-7B-Instruct-v0.3"
+        # st.session_state.model_id = "meta-llama/Llama-3.2-3B-Instruct"
+        st.session_state.model_id = "mistralai/Mistral-7B-Instruct-v0.3"
 
     if 'RAG_type' not in st.session_state:
         st.session_state.RAG_type = "open_questions"
@@ -161,6 +161,11 @@ def init_session_states():
         st.session_state.show_pdf_uploader = False
     if 'show_html_uploader' not in st.session_state:
         st.session_state.show_html_uploader = False
+    
+    # if 'init_done' not in st.session_state:
+    #     st.session_state.init_done = True
+    if 'selBox_RAG_choice' not in st.session_state:
+        st.session_state.selBox_RAG_choice = "Answer questions"
 
 init_session_states()
 
@@ -182,8 +187,8 @@ if st.session_state.RAG_type == "open_questions":
 elif st.session_state.RAG_type == "MCQ":
     st.write(
         """
-        Specialized in making MCQs.
-        First, input a subject and then answer with only the corresponding letter or number.
+        Specialized in making MCQs.\n
+        First, input a subject and then answer with only the corresponding letter or number.\n
         You can reset this conversation or open a new page if you want a MCQ for another subject.
         """
     )
@@ -217,22 +222,23 @@ RAG_choices = {
 
 col1, col2, col3 = st.columns(3)
 
+def callback_btn():
+    reset_conv()
+
 with col1:
-    btn1 = st.button('Reset Conversation')
+    btn1 = st.button('Reset Conversation', on_click=callback_btn)
 with col2:
     btn2 = st.button('Add pdf')
 with col3:
     btn3 = st.button('Add html')
 
-# Button actions
-if btn1:
-    reset_conv()
-
 if btn2:
-    st.session_state.show_pdf_uploader = True
+    st.session_state.show_pdf_uploader = not st.session_state.show_pdf_uploader
+    # st.session_state.show_pdf_uploader = True
 
 if btn3:
-    st.session_state.show_html_uploader = True
+    st.session_state.show_html_uploader = not st.session_state.show_html_uploader
+    # st.session_state.show_html_uploader = True
 
 # Display file uploaders based on session state flags
 if st.session_state.show_pdf_uploader:
@@ -297,17 +303,19 @@ if st.session_state.show_html_uploader:
 
 selCol1, _ = st.columns([1, 4])
 
+def callback_selBox():
+    reset_conv()
+    option = st.session_state.selBox_choice
+    RAG_type = RAG_choices[option]
+    st.session_state.RAG_type = RAG_type
+
 with selCol1:
     RAG_option = st.selectbox(
         label="What functionality do you need?",
         options=list(RAG_choices.keys()),
-        index=0
+        index=0,
+        key="selBox_choice",
+        on_change=callback_selBox
     )
-
-if RAG_option:
-    session_RAG_type = RAG_choices[RAG_option]
-    if session_RAG_type != st.session_state.RAG_type:
-        st.session_state.RAG_type = session_RAG_type
-        reset_conv()
 
 st.write("Currently selected:", RAG_option)

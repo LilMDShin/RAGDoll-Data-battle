@@ -162,8 +162,6 @@ def init_session_states():
     if 'show_html_uploader' not in st.session_state:
         st.session_state.show_html_uploader = False
     
-    # if 'init_done' not in st.session_state:
-    #     st.session_state.init_done = True
     if 'selBox_RAG_choice' not in st.session_state:
         st.session_state.selBox_RAG_choice = "Answer questions"
 
@@ -234,11 +232,9 @@ with col3:
 
 if btn2:
     st.session_state.show_pdf_uploader = not st.session_state.show_pdf_uploader
-    # st.session_state.show_pdf_uploader = True
 
 if btn3:
     st.session_state.show_html_uploader = not st.session_state.show_html_uploader
-    # st.session_state.show_html_uploader = True
 
 # Display file uploaders based on session state flags
 if st.session_state.show_pdf_uploader:

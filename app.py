@@ -121,11 +121,6 @@ def rag_MCQ(model_id, client_inference, query, dict_chunks):
 
     return model_res
 
-# For the RAG that is specialized in creating open questions and correcting user
-def rag_create_quest(model_id, client_inference, query, dict_chunks):
-    # TODO: Implement functionality for creating questions
-    pass
-
 # Display conversation history
 def display_conversations():
     for conversation in st.session_state.interface_conv_history:
@@ -192,6 +187,8 @@ elif st.session_state.RAG_type == "MCQ":
         You can reset this conversation or open a new page if you want a MCQ for another subject.
         """
     )
+elif st.session_state.RAG_type == "create_questions":
+    st.write("Ready to create questions and give corrections on the answer.")
 
 # Process input when the user submits
 if st.session_state.input:

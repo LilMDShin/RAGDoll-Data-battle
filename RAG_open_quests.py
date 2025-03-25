@@ -3,6 +3,7 @@ from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 from utils.chunks import load_index_and_chunks
 from utils.chunks import retrieve_chunks
+import os
 
 def RAG_conv(model_id, client_inference, conv_history):
     completion = client_inference.chat.completions.create(
@@ -50,15 +51,15 @@ if __name__ == "__main__":
 
     client = InferenceClient(
         # provider="hf-inference"
-        provider="novita"
+        provider="novita",
         # provider="nebius",
-        # token = os.environ.get("API_KEY")
+        token = os.environ.get("API_KEY")
     )
 
     conv_history = [
             {
                 "role": "system",
-                "content": f"{system_prompt}\nYou always answer in the same language as the query and within 500 words sources included.\nYou have access to the following context : {context}"
+                "content": f"Do not show this on your response.\n{system_prompt}\nYou always answer in the same language as the query and within 500 words sources included.\nYou have access to the following context : {context}"
             }, 
             {
                 "role": "user",

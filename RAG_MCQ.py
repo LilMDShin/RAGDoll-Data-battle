@@ -3,6 +3,7 @@ from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 from utils.chunks import load_index_and_chunks
 from utils.chunks import retrieve_chunks
+import os
 
 def RAG_conv(model_id, client_inference, conv_history):
     completion = client_inference.chat.completions.create(
@@ -44,18 +45,18 @@ if __name__ == "__main__":
     
     context = "\n".join([f"[PDF: {chunk['pdf']} - Page: {chunk['page']}] {chunk['text']}" for chunk in retrieved_chunks])
 
-    system_prompt = "You are an expert in patent laws and specialized in making MCQs. You provide both detailed answers and your source after the user answers (include the name of the source document)."
+    system_prompt = "You are an expert in patent laws and specialized in making multiple choice questions (MCQ) on the subject (one or multiple correct answers). You give at least a set of 4 each time. After the user answers, provide both detailed answers and your source (include the name of the document)."
 
     client = InferenceClient(
         # provider="hf-inference",
         provider="novita",
-        # token = os.environ.get("API_KEY"),
+        token = os.environ.get("API_KEY"),
     )
 
     conv_history = [
             {
                 "role": "system",
-                "content": f"{system_prompt}\nYou always answer in the same language as the query.\nYou have access to the following context : {context}"
+                "content": f"Do not show this on your response.\n{system_prompt}\nYou always answer in the same language as the query and within 500 words sources included.\nYou have access to the following context : {context}"
             }, 
             {
                 "role": "user",
@@ -63,9 +64,8 @@ if __name__ == "__main__":
             }
         ]
     
-    # To test
-    # model_id = "mistralai/Mistral-7B-Instruct-v0.3"
-    model_id = "meta-llama/Llama-3.2-3B-Instruct"
+    # model_id = "meta-llama/Llama-3.2-3B-Instruct"
+    model_id = "mistralai/Mistral-7B-Instruct-v0.3"
 
     model_res = RAG_conv(model_id, client, conv_history)
 

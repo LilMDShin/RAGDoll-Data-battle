@@ -209,7 +209,6 @@ with col3:
         st.session_state.show_html_uploader = not st.session_state.show_html_uploader
 # PDF file uploader section
 if st.session_state.show_pdf_uploader:
-    
     pdf_file = st.file_uploader("Upload a PDF file", type="pdf", key="pdf_uploader")
     if pdf_file is not None:
         st.write("PDF file uploaded:", pdf_file.name)
@@ -227,6 +226,7 @@ if st.session_state.show_pdf_uploader:
             else:
                 dict_chunks = update_faiss_and_chunks()
                 reset_conv()
+                st.session_state.show_pdf_uploader = False
         else:
             st.error(f"PDF already exists at: {output_path}")
 
@@ -248,9 +248,9 @@ if st.session_state.show_html_uploader:
             else:
                 dict_chunks = update_faiss_and_chunks()
                 reset_conv()
+                st.session_state.show_html_uploader = False
         else:
             st.error(f"HTML file already exists at: {output_path}")
-
 # RAG functionality selection
 selCol1, _ = st.columns([1, 4])
 def callback_selBox():

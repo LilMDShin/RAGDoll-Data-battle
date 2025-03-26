@@ -27,7 +27,6 @@ def load_embedding_model():
 @st.cache_resource
 def load_chunks():
     save_folder = "saved_index"
-    st.write("Loading FAISS index and saved chunks...")
     index, chunks = load_index_and_chunks(save_folder)
     return {"index": index, "chunks": chunks}
 
@@ -98,6 +97,7 @@ def display_conversations():
     for conversation in st.session_state.interface_conv_history:
         st.markdown(f"**User**: {conversation['user']}")
         st.markdown(f"**Model**: {conversation['model']}")
+    st.session_state.input = ''
 
 def submit():
     st.session_state.input = st.session_state.user_input
@@ -179,6 +179,8 @@ if st.session_state.input:
         'model': model_response,
     })
     display_conversations()
+else:
+    display_conversations()
 
 # User input box
 user_input = st.text_input("Your Input:", key="user_input", on_change=submit)
@@ -200,17 +202,14 @@ def callback_btn():
 with col1:
     st.button('Reset Conversation', on_click=callback_btn)
 with col2:
-    btn_pdf = st.button('Add pdf')
+    if st.button('Add pdf'):
+        st.session_state.show_pdf_uploader = not st.session_state.show_pdf_uploader
 with col3:
-    btn_html = st.button('Add html')
-
-if btn_pdf:
-    st.session_state.show_pdf_uploader = not st.session_state.show_pdf_uploader
-if btn_html:
-    st.session_state.show_html_uploader = not st.session_state.show_html_uploader
-
+    if st.button('Add html'):
+        st.session_state.show_html_uploader = not st.session_state.show_html_uploader
 # PDF file uploader section
 if st.session_state.show_pdf_uploader:
+    
     pdf_file = st.file_uploader("Upload a PDF file", type="pdf", key="pdf_uploader")
     if pdf_file is not None:
         st.write("PDF file uploaded:", pdf_file.name)
@@ -227,12 +226,13 @@ if st.session_state.show_pdf_uploader:
                 st.error("Stop PDF processing")
             else:
                 dict_chunks = update_faiss_and_chunks()
+                reset_conv()
         else:
             st.error(f"PDF already exists at: {output_path}")
-        st.session_state.show_pdf_uploader = False
 
 # HTML file uploader section
 if st.session_state.show_html_uploader:
+    reset_conv()
     html_file = st.file_uploader("Upload an HTML file", type="html", key="html_uploader")
     if html_file is not None:
         st.write("HTML file uploaded:", html_file.name)
@@ -247,9 +247,9 @@ if st.session_state.show_html_uploader:
                 st.error("Stop HTML processing")
             else:
                 dict_chunks = update_faiss_and_chunks()
+                reset_conv()
         else:
             st.error(f"HTML file already exists at: {output_path}")
-        st.session_state.show_html_uploader = False
 
 # RAG functionality selection
 selCol1, _ = st.columns([1, 4])

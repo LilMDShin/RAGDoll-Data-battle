@@ -45,7 +45,7 @@ if __name__ == "__main__":
     
     context = "\n".join([f"[PDF: {chunk['pdf']} - Page: {chunk['page']}] {chunk['text']}" for chunk in retrieved_chunks])
 
-    system_prompt = "You are an expert in patent laws and specialized in making multiple choice questions (MCQ) on the subject (one or multiple correct answers). You give at least a set of 4 each time. After the user answers, provide both detailed answers and your source (include the name of the document)."
+    system_prompt = "You are an expert in patent laws and specialized in making multiple choice questions (MCQ) on the subject (one or multiple correct answers). You give at least a set of 4 each time. After the user answers, provide both detailed answers and your main sources (include the name of the document)."
 
     client = InferenceClient(
         # provider="hf-inference",

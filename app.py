@@ -155,9 +155,8 @@ def callback_selBox_RAG():
 
 # RAG response language selection
 def callback_selBox_lang():
-        # To test
-        # reset_conv()
         st.session_state.language_choice = st.session_state.selBox_lang_choice
+        reset_conv()
 
 # ----------------------------
 # Init
@@ -299,4 +298,6 @@ if st.session_state.input:
     })
 
 # User input box
-user_input = st.text_input("Your Input:", key="user_input", on_change=submit)
+user_input = st.text_input("Your Input:", key="user_input")
+
+st.button("Submit", on_click=submit)

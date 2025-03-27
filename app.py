@@ -36,7 +36,7 @@ def client_for_inference():
         provider="novita",
         # provider="hf-inference"
         # provider="nebius",
-        # token=os.environ.get("API_KEY")
+        token=os.environ.get("API_KEY")
     )
 
 # ----------------------------
@@ -55,6 +55,7 @@ def rag_generic(model_id, client_inference, query, dict_chunks, system_prompt, i
     context = get_context(query, dict_chunks, embedding_model)
     # When starting a new conversation, add the system prompt with full context
     if not st.session_state.model_conv_history:
+        # For at least Deutsch to work, need to specify in system prompt (note : English always seems to work)
         st.session_state.model_conv_history.append({
             "role": "system",
             "content": (
@@ -80,7 +81,7 @@ def rag_model(model_id, client_inference, query, dict_chunks):
     elif st.session_state.RAG_type == "create_questions":
         prompt = (
             "You are an expert in patent laws and making questions on the subject. "
-            "You provide both detailed answers and your source after the user answers (include the name of the document)."
+            "After the user answers, provide both detailed answers and your main sources (include the name of the document)."
         )
     return rag_generic(model_id, client_inference, query, dict_chunks, prompt, include_context_on_history=True)
 
@@ -88,7 +89,7 @@ def rag_MCQ(model_id, client_inference, query, dict_chunks):
     prompt = (
         "You are an expert in patent laws and specialized in making multiple choice questions (MCQ) on the subject "
         "(one or multiple correct answers). You give at least a set of 4 each time. After the user answers, provide both "
-        "detailed answers and your source (include the name of the document)."
+        "detailed answers and your main sources (include the name of the document)."
     )
     # For MCQs, we do not include additional context when conversation already exists
     return rag_generic(model_id, client_inference, query, dict_chunks, prompt, include_context_on_history=False)
@@ -126,6 +127,9 @@ def init_session_states():
         st.session_state.show_html_uploader = False
     if 'selBox_RAG_choice' not in st.session_state:
         st.session_state.selBox_RAG_choice = "Answer questions"
+    # For now only to change the RAG's language output
+    if 'language_choice' not in st.session_state:
+        st.session_state.language_choice = "English"
 
 def update_faiss_and_chunks():
     st.write("Updating the FAISS index with the new data...")
@@ -138,14 +142,122 @@ def update_faiss_and_chunks():
     st.write("FAISS index updated with the new data...")
     return new_chunks
 
+# RAG functionality selection
+def callback_selBox_RAG():
+    reset_conv()
+    option = st.session_state.selBox_choice
+    st.session_state.RAG_type = RAG_choices[option]
+
+# RAG response language selection
+def callback_selBox_lang():
+        # To test
+        # reset_conv()
+        st.session_state.language_choice = st.session_state.selBox_lang_choice
+
 # ----------------------------
-# Main App Logic
+# Init
 # ----------------------------
 init_session_states()
 embedding_model = load_embedding_model()
 dict_chunks = load_chunks()
 client_inference = client_for_inference()
+# ----------------------------
+# Tools and RAG Options
+# ----------------------------
+RAG_choices = {
+    "Answer questions": "open_questions", 
+    "MCQs": "MCQ",
+    "Create questions": "create_questions"
+}
 
+languages = ["English", "French", "Deutsch"]
+
+with st.sidebar:
+    st.title("Tools")
+    
+    if st.button("Reset Conversation", on_click=reset_conv):
+        reset_conv()
+    
+    if st.button("Add PDF"):
+        st.session_state.show_pdf_uploader = not st.session_state.show_pdf_uploader
+    
+    # PDF file uploader section
+    if st.session_state.show_pdf_uploader:
+        pdf_file = st.file_uploader("Upload a PDF file", type="pdf", key="pdf_uploader")
+        if pdf_file is not None:
+            st.write("PDF file uploaded:", pdf_file.name)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(pdf_file.read())
+                tmp_path = tmp.name
+            output_path = os.path.join("input/pdf", pdf_file.name)
+            if not os.path.exists(output_path):
+                repair_pdf(tmp_path, output_path)
+                st.write(f"PDF repaired and saved at: {output_path}")
+                output_str, err = process_pdf_to_json(output_path, "input/json")
+                st.write(output_str)
+                if err:
+                    st.error("Stop PDF processing")
+                else:
+                    dict_chunks = update_faiss_and_chunks()
+                    reset_conv()
+                    st.session_state.show_pdf_uploader = False
+            else:
+                st.error(f"PDF already exists at: {output_path}")
+    
+    if st.button("Add HTML"):
+        st.session_state.show_html_uploader = not st.session_state.show_html_uploader
+
+    # HTML file uploader section
+    if st.session_state.show_html_uploader:
+        html_file = st.file_uploader("Upload an HTML file", type="html", key="html_uploader")
+        if html_file is not None:
+            st.write("HTML file uploaded:", html_file.name)
+            output_path = os.path.join("input/html", html_file.name)
+            if not os.path.exists(output_path):
+                with open(output_path, "wb") as f:
+                    f.write(html_file.read())
+                st.write(f"HTML file saved at: {output_path}")
+                output_str, err = process_html_to_json(output_path, "input/json")
+                st.write(output_str)
+                if err:
+                    st.error("Stop HTML processing")
+                else:
+                    dict_chunks = update_faiss_and_chunks()
+                    reset_conv()
+                    st.session_state.show_html_uploader = False
+            else:
+                st.error(f"HTML file already exists at: {output_path}")
+    
+    st.markdown("---")
+
+    st.title("RAG options")
+
+    selBoxCol, _ = st.columns([4, 1])
+
+    with selBoxCol:
+        st.session_state.input = ''
+        lang_option = st.selectbox(
+            label="Model response language",
+            options=languages,
+            index=0,
+            key="selBox_lang_choice",
+            on_change=callback_selBox_lang
+        )
+
+    with selBoxCol:
+        st.session_state.input = ''
+        RAG_option = st.selectbox(
+            label="RAG functionality",
+            options=list(RAG_choices.keys()),
+            index=0,
+            key="selBox_choice",
+            on_change=callback_selBox_RAG
+        )
+    st.write("Currently selected:", RAG_option)
+
+# ----------------------------
+# Main App Logic
+# ----------------------------
 st.title("Retrieval-Augmented Generation (RAG) Base")
 st.write(
     """
@@ -193,77 +305,3 @@ RAG_choices = {
     "MCQs": "MCQ",
     "Create questions": "create_questions"
 }
-
-col1, col2, col3 = st.columns(3)
-
-def callback_btn():
-    reset_conv()
-
-with col1:
-    st.button('Reset Conversation', on_click=callback_btn)
-with col2:
-    if st.button('Add pdf'):
-        st.session_state.show_pdf_uploader = not st.session_state.show_pdf_uploader
-with col3:
-    if st.button('Add html'):
-        st.session_state.show_html_uploader = not st.session_state.show_html_uploader
-# PDF file uploader section
-if st.session_state.show_pdf_uploader:
-    pdf_file = st.file_uploader("Upload a PDF file", type="pdf", key="pdf_uploader")
-    if pdf_file is not None:
-        st.write("PDF file uploaded:", pdf_file.name)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(pdf_file.read())
-            tmp_path = tmp.name
-        output_path = os.path.join("input/pdf", pdf_file.name)
-        if not os.path.exists(output_path):
-            repair_pdf(tmp_path, output_path)
-            st.write(f"PDF repaired and saved at: {output_path}")
-            output_str, err = process_pdf_to_json(output_path, "input/json")
-            st.write(output_str)
-            if err:
-                st.error("Stop PDF processing")
-            else:
-                dict_chunks = update_faiss_and_chunks()
-                reset_conv()
-                st.session_state.show_pdf_uploader = False
-        else:
-            st.error(f"PDF already exists at: {output_path}")
-
-# HTML file uploader section
-if st.session_state.show_html_uploader:
-    reset_conv()
-    html_file = st.file_uploader("Upload an HTML file", type="html", key="html_uploader")
-    if html_file is not None:
-        st.write("HTML file uploaded:", html_file.name)
-        output_path = os.path.join("input/html", html_file.name)
-        if not os.path.exists(output_path):
-            with open(output_path, "wb") as f:
-                f.write(html_file.read())
-            st.write(f"HTML file saved at: {output_path}")
-            output_str, err = process_html_to_json(output_path, "input/json")
-            st.write(output_str)
-            if err:
-                st.error("Stop HTML processing")
-            else:
-                dict_chunks = update_faiss_and_chunks()
-                reset_conv()
-                st.session_state.show_html_uploader = False
-        else:
-            st.error(f"HTML file already exists at: {output_path}")
-# RAG functionality selection
-selCol1, _ = st.columns([1, 4])
-def callback_selBox():
-    reset_conv()
-    option = st.session_state.selBox_choice
-    st.session_state.RAG_type = RAG_choices[option]
-
-with selCol1:
-    RAG_option = st.selectbox(
-        label="What functionality do you need?",
-        options=list(RAG_choices.keys()),
-        index=0,
-        key="selBox_choice",
-        on_change=callback_selBox
-    )
-st.write("Currently selected:", RAG_option)

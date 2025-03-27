@@ -5,7 +5,7 @@ from utils.chunks import load_index_and_chunks, retrieve_chunks
 from utils.repair_pdf import repair_pdf
 from utils.preprocess import process_pdf_to_json, process_html_to_json
 from utils.faiss_index import update_index
-from RAG_open_quests import RAG_conv
+from utils.rag import rag_stream
 from dotenv import load_dotenv
 import os
 import tempfile
@@ -69,7 +69,7 @@ def rag_generic(model_id, client_inference, query, dict_chunks, system_prompt, i
         st.session_state.model_conv_history.append({"role": "user", "content": query})
     
     # Obtenir la réponse en streaming via le générateur
-    response_generator = RAG_conv(model_id, client_inference, st.session_state.model_conv_history)
+    response_generator = rag_stream(model_id, client_inference, st.session_state.model_conv_history)
     st.markdown(f"**User**: {query}")
     placeholder = st.empty()  # Ce placeholder sera mis à jour en temps réel
     full_response = ""

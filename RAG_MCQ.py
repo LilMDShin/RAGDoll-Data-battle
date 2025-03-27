@@ -3,19 +3,8 @@ from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 from utils.chunks import load_index_and_chunks
 from utils.chunks import retrieve_chunks
+from utils.rag import rag
 import os
-
-def RAG_conv(model_id, client_inference, conv_history):
-    completion = client_inference.chat.completions.create(
-        model=model_id,
-        messages=conv_history,
-        max_tokens=550,
-        temperature=0,
-        # top_p=1
-        top_p=0.99
-    )
-    model_res = completion.choices[0].message.content
-    return(model_res)
 
 if __name__ == "__main__":
     # load environment variables from .env file
@@ -67,7 +56,7 @@ if __name__ == "__main__":
     # model_id = "meta-llama/Llama-3.2-3B-Instruct"
     model_id = "mistralai/Mistral-7B-Instruct-v0.3"
 
-    model_res = RAG_conv(model_id, client, conv_history)
+    model_res = rag(model_id, client, conv_history)
 
     print(model_res)
 
@@ -90,7 +79,7 @@ if __name__ == "__main__":
             "content": query
         })
 
-        model_res = RAG_conv(model_id, client, conv_history)
+        model_res = rag(model_id, client, conv_history)
 
         print(model_res)
 

@@ -3,28 +3,8 @@ from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 from utils.chunks import load_index_and_chunks
 from utils.chunks import retrieve_chunks
+from utils.rag import rag
 import os
-
-def RAG_conv(model_id, client_inference, conv_history):
-    stream = client_inference.chat.completions.create(
-        model=model_id,
-        messages=conv_history,
-        max_tokens=550,
-        temperature=0,
-        top_p=0.99,
-        stream=True  # Enable streaming mode if supported
-    )
-    full_response = ""
-    for token in stream:
-        # Try to get the delta value
-        delta = token["choices"][0].get("delta")
-        # If delta is a dict, extract the "content"; otherwise, use it directly or fallback to ""
-        if isinstance(delta, dict):
-            token_text = delta.get("content") or ""
-        else:
-            token_text = delta or ""
-        full_response += token_text
-        yield full_response
 
 if __name__ == "__main__":
     # load environment variables from .env file
@@ -79,7 +59,7 @@ if __name__ == "__main__":
     # model_id = "meta-llama/Llama-3.2-3B-Instruct",
     model_id = "mistralai/Mistral-7B-Instruct-v0.3"
 
-    model_res = RAG_conv(model_id, client, conv_history)
+    model_res = rag(model_id, client, conv_history)
 
     print(model_res)
 
@@ -121,7 +101,7 @@ if __name__ == "__main__":
             "content": query
         })
 
-        model_res = RAG_conv(model_id, client, conv_history)
+        model_res = rag(model_id, client, conv_history)
 
         print(model_res)
 

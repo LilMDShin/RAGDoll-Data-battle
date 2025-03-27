@@ -68,15 +68,15 @@ def rag_generic(model_id, client_inference, query, dict_chunks, system_prompt, i
             st.session_state.model_conv_history.append({"role": "system", "content": f"Additional context : {context}"})
         st.session_state.model_conv_history.append({"role": "user", "content": query})
     
-    # Obtenir la réponse en streaming via le générateur
+    # Get the response in streaming mode using the generator
     response_generator = rag_stream(model_id, client_inference, st.session_state.model_conv_history)
     st.markdown(f"**User**: {query}")
-    placeholder = st.empty()  # Ce placeholder sera mis à jour en temps réel
+    placeholder = st.empty()  # This placeholder is updated in real time
     full_response = ""
     for token in response_generator:
-        full_response = token  # token contient l'accumulation de la réponse
+        full_response = token  # token contains the accumulation of the response
         placeholder.markdown("**Model**: " + full_response)
-    # Option 1 : Ne pas ajouter la réponse à l'historique pour éviter le double affichage
+
     st.session_state.model_conv_history.append({"role": "assistant", "content": full_response})
     
     return full_response
@@ -166,6 +166,7 @@ init_session_states()
 embedding_model = load_embedding_model()
 dict_chunks = load_chunks()
 client_inference = client_for_inference()
+
 # ----------------------------
 # Tools and RAG Options
 # ----------------------------
@@ -281,11 +282,9 @@ elif st.session_state.RAG_type == "MCQ":
 elif st.session_state.RAG_type == "create_questions":
     st.write("Ready to create questions and give corrections on the answer.")
 
-
 conversation_container = st.container()
 with conversation_container:
     display_conversations()
-
 
 # Process input when the user submits a query
 if st.session_state.input:
@@ -301,12 +300,3 @@ if st.session_state.input:
 
 # User input box
 user_input = st.text_input("Your Input:", key="user_input", on_change=submit)
-
-# ----------------------------
-# File Uploaders and RAG Options
-# ----------------------------
-RAG_choices = {
-    "Answer questions": "open_questions", 
-    "MCQs": "MCQ",
-    "Create questions": "create_questions"
-}

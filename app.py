@@ -175,8 +175,7 @@ languages = ["English", "French", "Deutsch"]
 with st.sidebar:
     st.title("Tools")
     
-    if st.button("Reset Conversation", on_click=reset_conv):
-        reset_conv()
+    st.button("Reset Conversation", on_click=reset_conv)
     
     if st.button("Add PDF"):
         st.session_state.show_pdf_uploader = not st.session_state.show_pdf_uploader

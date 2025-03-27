@@ -53,9 +53,7 @@ def get_context(query, dict_chunks, embedding_model):
 
 def rag_generic(model_id, client_inference, query, dict_chunks, system_prompt, include_context_on_history=True):
     context = get_context(query, dict_chunks, embedding_model)
-    # When starting a new conversation, add the system prompt with full context
     if not st.session_state.model_conv_history:
-        # For at least Deutsch to work, need to specify in system prompt (note : English always seems to work)
         st.session_state.model_conv_history.append({
             "role": "system",
             "content": (
@@ -66,14 +64,22 @@ def rag_generic(model_id, client_inference, query, dict_chunks, system_prompt, i
         })
         st.session_state.model_conv_history.append({"role": "user", "content": query})
     else:
-        # Optionally add additional context if conversation exists
         if include_context_on_history:
             st.session_state.model_conv_history.append({"role": "system", "content": f"Additional context : {context}"})
         st.session_state.model_conv_history.append({"role": "user", "content": query})
     
-    model_res = RAG_conv(model_id, client_inference, st.session_state.model_conv_history)
-    st.session_state.model_conv_history.append({"role": "assistant", "content": model_res})
-    return model_res
+    # Obtenir la réponse en streaming via le générateur
+    response_generator = RAG_conv(model_id, client_inference, st.session_state.model_conv_history)
+    st.markdown(f"**User**: {query}")
+    placeholder = st.empty()  # Ce placeholder sera mis à jour en temps réel
+    full_response = ""
+    for token in response_generator:
+        full_response = token  # token contient l'accumulation de la réponse
+        placeholder.markdown("**Model**: " + full_response)
+    # Option 1 : Ne pas ajouter la réponse à l'historique pour éviter le double affichage
+    st.session_state.model_conv_history.append({"role": "assistant", "content": full_response})
+    
+    return full_response
 
 def rag_model(model_id, client_inference, query, dict_chunks):
     if st.session_state.RAG_type == "open_questions":
@@ -98,7 +104,6 @@ def display_conversations():
     for conversation in st.session_state.interface_conv_history:
         st.markdown(f"**User**: {conversation['user']}")
         st.markdown(f"**Model**: {conversation['model']}")
-    st.session_state.input = ''
 
 def submit():
     st.session_state.input = st.session_state.user_input
@@ -276,6 +281,12 @@ elif st.session_state.RAG_type == "MCQ":
 elif st.session_state.RAG_type == "create_questions":
     st.write("Ready to create questions and give corrections on the answer.")
 
+
+conversation_container = st.container()
+with conversation_container:
+    display_conversations()
+
+
 # Process input when the user submits a query
 if st.session_state.input:
     if st.session_state.RAG_type in ["open_questions", "create_questions"]:
@@ -287,9 +298,6 @@ if st.session_state.input:
         'user': st.session_state.input,
         'model': model_response,
     })
-    display_conversations()
-else:
-    display_conversations()
 
 # User input box
 user_input = st.text_input("Your Input:", key="user_input", on_change=submit)

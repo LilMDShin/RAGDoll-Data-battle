@@ -36,7 +36,7 @@ if __name__ == "__main__":
     context = "\n".join([f"[PDF: {chunk['pdf']} - Page: {chunk['page']}] {chunk['text']}" for chunk in retrieved_chunks])
 
     # Define system prompt
-    system_prompt = "You are an expert in patent laws. You provide both detailed answers and your source (include the name of the document)."
+    system_prompt = "You are an expert in patent laws. You provide both detailed answers and your main sources (include the name of the document)."
 
     client = InferenceClient(
         # provider="hf-inference"

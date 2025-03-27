@@ -235,7 +235,6 @@ with st.sidebar:
     selBoxCol, _ = st.columns([4, 1])
 
     with selBoxCol:
-        st.session_state.input = ''
         lang_option = st.selectbox(
             label="Model response language",
             options=languages,
@@ -245,7 +244,6 @@ with st.sidebar:
         )
 
     with selBoxCol:
-        st.session_state.input = ''
         RAG_option = st.selectbox(
             label="RAG functionality",
             options=list(RAG_choices.keys()),

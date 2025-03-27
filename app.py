@@ -7,6 +7,7 @@ from utils.preprocess import process_pdf_to_json, process_html_to_json
 from utils.faiss_index import update_index
 from utils.rag import rag_stream
 from dotenv import load_dotenv
+import re
 import os
 import tempfile
 import shutil
@@ -93,17 +94,56 @@ def rag_model(model_id, client_inference, query, dict_chunks):
 
 def rag_MCQ(model_id, client_inference, query, dict_chunks):
     prompt = (
-        "You are an expert in patent laws and specialized in making multiple choice questions (MCQ) on the subject "
-        "(one or multiple correct answers). You give at least a set of 4 each time. After the user answers, provide both "
-        "detailed answers and your main sources (include the name of the document)."
+        "You are an expert in patent laws and specialize in creating multiple choice questions (MCQ) on this subject "
+        "with one or multiple correct answers. Generate an MCQ with at least four options. Use exactly the following structure:/n/n"
+        "Question: <MCQ question text>/n"
+        "Options:/n"
+        "A) <Option A text>/n"
+        "B) <Option B text>/n"
+        "C) <Option C text>/n"
+        "D) <Option D text>/n"
+        "Answer: <Option letter(s)>/n"
+        "Explanation: <Detailed explanation why the answer is correct, including key documents>/n"
+        "Sources: <List of main sources (document names)>/n/n"
     )
+
     # For MCQs, we do not include additional context when conversation already exists
     return rag_generic(model_id, client_inference, query, dict_chunks, prompt, include_context_on_history=False)
 
+def display_mcq(mcq, key):
+    st.write("### MCQ:")
+    st.markdown(f"**Question:** {mcq.get('question', 'No question provided')}")
+    with st.form(key):
+        user_choice = st.radio(
+            "Select your answer:",
+            options=list(mcq.get("options", {}).keys()),
+            format_func=lambda opt: f"{opt}) {mcq['options'][opt]}"
+        )
+        submitted = st.form_submit_button("Submit Answer")
+        if submitted:
+            correct_answer = mcq.get("hidden_answer", "").upper()
+            if user_choice.upper() == correct_answer:
+                result_text = "Correct Answer!"
+            else:
+                result_text = "Incorrect Answer."
+            st.subheader("Result")
+            if result_text == "Correct Answer!":
+                st.success(result_text)
+            else:
+                st.error(result_text)
+            st.subheader("Explanation")
+            st.write(mcq.get("hidden_explanation", "No explanation available."))
+            st.subheader("Sources")
+            st.write(mcq.get("hidden_sources", "No sources available."))
+    return 
+
 def display_conversations():
-    for conversation in st.session_state.interface_conv_history:
-        st.markdown(f"**User**: {conversation['user']}")
-        st.markdown(f"**Model**: {conversation['model']}")
+    for i in range(len(st.session_state.interface_conv_history)):
+        if st.session_state.RAG_type == "MCQ":
+            display_mcq(st.session_state.interface_conv_history[i]['model'], str(i))
+        else :    
+            st.markdown(f"**User**: {st.session_state.interface_conv_history[i]['user']}")
+            st.markdown(f"**Model**: {st.session_state.interface_conv_history[i]['model']}")
 
 def submit():
     st.session_state.input = st.session_state.user_input
@@ -157,6 +197,38 @@ def callback_selBox_RAG():
 def callback_selBox_lang():
         st.session_state.language_choice = st.session_state.selBox_lang_choice
         reset_conv()
+
+def parse_mcq(mcq_text):
+    mcq_data = {}
+
+    # Extract question
+    question_match = re.search(r"Question:\s*(.*)", mcq_text)
+    if question_match:
+        mcq_data["question"] = question_match.group(1).strip()
+
+    # Extract options (A to D)
+    options = {}
+    options_matches = re.findall(r"([A-D])\)\s*(.*)", mcq_text)
+    for key, value in options_matches:
+        options[key] = value.strip()
+    mcq_data["options"] = options
+
+    # Extract hidden answer
+    hidden_answer_match = re.search(r"Answer:\s*(.*)", mcq_text)
+    if hidden_answer_match:
+        mcq_data["hidden_answer"] = hidden_answer_match.group(1).strip()
+
+    # Extract hidden explanation
+    hidden_explanation_match = re.search(r"Explanation:\s*(.*)", mcq_text)
+    if hidden_explanation_match:
+        mcq_data["hidden_explanation"] = hidden_explanation_match.group(1).strip()
+
+    # Extract hidden sources
+    hidden_sources_match = re.search(r"Sources:\s*(.*)", mcq_text)
+    if hidden_sources_match:
+        mcq_data["hidden_sources"] = hidden_sources_match.group(1).strip()
+
+    return mcq_data
 
 # ----------------------------
 # Init
@@ -287,15 +359,32 @@ with conversation_container:
 
 # Process input when the user submits a query
 if st.session_state.input:
-    if st.session_state.RAG_type in ["open_questions", "create_questions"]:
-        model_response = rag_model(st.session_state.model_id, client_inference, st.session_state.input, dict_chunks)
-    elif st.session_state.RAG_type == "MCQ":
-        model_response = rag_MCQ(st.session_state.model_id, client_inference, st.session_state.input, dict_chunks)
+    # Capture the user query before resetting
+    user_query = st.session_state.input
+
+    if st.session_state.RAG_type == "MCQ":
+        # Only call the model if we haven't generated an MCQ yet for this query
+        st.session_state.mcq_result = rag_MCQ(
+            st.session_state.model_id,
+            client_inference,
+            user_query,
+            dict_chunks
+        )
+        st.session_state.mcq = parse_mcq(st.session_state.mcq_result)
+        # Use the stored MCQ to build the UI (with a consistent form key)
+        model_response = st.session_state.mcq
+        display_mcq(st.session_state.mcq, "mqc_form")
+    else:
+        # For other RAG types (open or create questions)
+        model_response = rag_model(st.session_state.model_id, client_inference, user_query, dict_chunks)
     
+    # Append the conversation history using the captured user_query
     st.session_state.interface_conv_history.append({
-        'user': st.session_state.input,
+        'user': user_query,
         'model': model_response,
     })
+    # Now clear the input to avoid re-calling the model on every re-run
+    st.session_state.input = ""
 
 # User input box
 user_input = st.text_input("Your Input:", key="user_input")

@@ -126,7 +126,6 @@ def rag_MCQ(model_id, client_inference, query, dict_chunks):
 def callback_mcq(user_choice, old):
     if not old:
         st.session_state[f"{st.session_state.nb_mcq}"] = user_choice
-        st.write(user_choice)
         st.session_state.nb_mcq += 1
     
 
@@ -170,7 +169,7 @@ def display_mcq(mcq, key, old):
                 st.success(result_text)
             else:
                 st.error(result_text)
-            st.write(mcq.get("hidden_answer", ""))
+            st.write(mcq.get("hidden_answer", "") + ") " + mcq['options'][mcq.get("hidden_answer", "")])
             st.subheader("Explanation")
             st.write(mcq.get("hidden_explanation", "No explanation available."))
             st.subheader("Sources")
@@ -245,32 +244,43 @@ def callback_selBox_lang():
 def parse_mcq(mcq_text):
     mcq_data = {}
 
-    # Extract question
-    question_match = re.search(r"Question:\s*(.*)", mcq_text)
+    # Extract question: capture text between "Question:" and "Options:"
+    question_match = re.search(r"Question:\s*(.*?)\s*Options:", mcq_text, re.DOTALL)
     if question_match:
         mcq_data["question"] = question_match.group(1).strip()
+    else:
+        mcq_data["question"] = ""
 
-    # Extract options (A to D)
+    # Extract options: capture text between "Options:" and "Answer:" then find each option (A-D)
+    options_match = re.search(r"Options:\s*(.*?)\s*Answer:", mcq_text, re.DOTALL)
     options = {}
-    options_matches = re.findall(r"([A-D])\)\s*(.*)", mcq_text)
-    for key, value in options_matches:
-        options[key] = value.strip()
+    if options_match:
+        options_text = options_match.group(1)
+        # Find options that start with a letter (A-D) followed by ')'
+        for key, value in re.findall(r"([A-D])\)\s*(.*)", options_text):
+            options[key] = value.strip()
     mcq_data["options"] = options
 
-    # Extract hidden answer
-    hidden_answer_match = re.search(r"Answer:\s*(.*)", mcq_text)
-    if hidden_answer_match:
-        mcq_data["hidden_answer"] = hidden_answer_match.group(1).strip()
+    # Extract hidden answer: capture text between "Answer:" and "Explanation:"
+    answer_match = re.search(r"Answer:\s*(.*?)\s*Explanation:", mcq_text, re.DOTALL)
+    if answer_match:
+        mcq_data["hidden_answer"] = answer_match.group(1).strip()
+    else:
+        mcq_data["hidden_answer"] = ""
 
-    # Extract hidden explanation
-    hidden_explanation_match = re.search(r"Explanation:\s*(.*)", mcq_text)
-    if hidden_explanation_match:
-        mcq_data["hidden_explanation"] = hidden_explanation_match.group(1).strip()
+    # Extract hidden explanation: capture text between "Explanation:" and "Sources:"
+    explanation_match = re.search(r"Explanation:\s*(.*?)\s*Sources:", mcq_text, re.DOTALL)
+    if explanation_match:
+        mcq_data["hidden_explanation"] = explanation_match.group(1).strip()
+    else:
+        mcq_data["hidden_explanation"] = ""
 
-    # Extract hidden sources
-    hidden_sources_match = re.search(r"Sources:\s*(.*)", mcq_text)
-    if hidden_sources_match:
-        mcq_data["hidden_sources"] = hidden_sources_match.group(1).strip()
+    # Extract hidden sources: capture text after "Sources:"
+    sources_match = re.search(r"Sources:\s*(.*)", mcq_text, re.DOTALL)
+    if sources_match:
+        mcq_data["hidden_sources"] = sources_match.group(1).strip()
+    else:
+        mcq_data["hidden_sources"] = ""
 
     return mcq_data
 
@@ -405,13 +415,13 @@ with conversation_container:
 if st.session_state.input:
     # Capture the user query before resetting
     user_query = st.session_state.input
-
+    preprompt = "Make a MCQ for " + user_query
     if st.session_state.RAG_type == "MCQ":
         # Only call the model if we haven't generated an MCQ yet for this query
         st.session_state.mcq_result = rag_MCQ(
             st.session_state.model_id,
             client_inference,
-            user_query,
+            preprompt,
             dict_chunks
         )
         st.session_state.mcq = parse_mcq(st.session_state.mcq_result)

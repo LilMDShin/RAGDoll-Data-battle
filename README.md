@@ -29,6 +29,7 @@ docker pull shinlil/data-battle-ragdoll-app:latest
 ```Bash
 docker run -p 8501:8501 -e API_KEY=<huggingface_access_token> shinlil/data-battle-ragdoll-app:latest
 ```
+The app should then become accessible from a browser at http://localhost:8501/
 
 ## Installation without docker
 
@@ -114,7 +115,7 @@ The app should then become accessible from a browser at http://localhost:8501/
 
 ### Using docker
 
-At this stage, you can build a docker image and run using the image
+At this stage, you can build a docker image and run using the image  
 Build the docker image
 ```Bash
 sudo docker build -t <name-docker-image> .

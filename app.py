@@ -87,27 +87,37 @@ def rag_generic(model_id, client_inference, query, dict_chunks, system_prompt, i
 
 def rag_model(model_id, client_inference, query, dict_chunks):
     if st.session_state.RAG_type == "open_questions":
-        prompt = "You are an expert in patent laws. You provide both detailed answers and your source (include the name of the document)."
+        prompt = """You are a world-class expert in patent law with deep knowledge of both domestic and international intellectual property statutes, regulations, and case law. Your role is to deliver comprehensive, detailed answers to inquiries on patent law. Each response should include:
+                    - A clear, step-by-step explanation of the relevant legal principles and their applications.
+                    - Specific examples or case references where applicable.
+                    - Citations that clearly list the names of the authoritative source documents (such as legislation, judicial opinions, or legal commentaries) used to support your answer. If multiple sources are used, list each one separately.
+
+                    Your answers should be precise, logically structured, and written in plain language to ensure clarity and ease of verification by the user.
+                 """
+
     elif st.session_state.RAG_type == "create_questions":
         prompt = (
-            "You are an expert in patent laws and making questions on the subject. "
-            "After the user answers, provide both detailed answers and your main sources (include the name of the document)."
+            "You are a world-class expert in patent law with exceptional skills in crafting challenging questions on the subject. "
+            "Your task is to ask an engaging question related to patent law based on the current conversation context (which is saved in cache), and then wait for the user's response. "
+            "Do not provide the answer immediately. Once the user submits an answer, prompt them to confirm if they believe their answer is correct or need further clarification. "
+            "If the user indicates uncertainty or provides an incorrect answer, deliver a detailed explanation of the correct answer, including step-by-step reasoning and citing your main authoritative sources (with the document names) to support your explanation."
         )
     return rag_generic(model_id, client_inference, query, dict_chunks, prompt, include_context_on_history=True)
 
 def rag_MCQ(model_id, client_inference, query, dict_chunks):
     prompt = (
-        "You are an expert in patent laws and specialize in creating multiple choice questions (MCQ) on this subject "
-        "with one or multiple correct answers. Generate an MCQ with at least four options. Use exactly the following structure:/n/n"
-        "Question: <MCQ question text>/n"
-        "Options:/n"
-        "A) <Option A text>/n"
-        "B) <Option B text>/n"
-        "C) <Option C text>/n"
-        "D) <Option D text>/n"
-        "Answer: <Option letter(s)>/n"
-        "Explanation: <Detailed explanation why the answer is correct, including key documents>/n"
-        "Sources: <List of main sources (document names)>/n/n"
+        "You are a world-class expert in patent law with exceptional skills in designing challenging multiple-choice questions (MCQs) on this subject. "
+        "Your task is to generate an MCQ that may include one or more correct answers, with a minimum of four answer options. "
+        "Please strictly follow the structure below:\n\n"
+        "Question: <MCQ question text>\n"
+        "Options:\n"
+        "A) <Option A text>\n"
+        "B) <Option B text>\n"
+        "C) <Option C text>\n"
+        "D) <Option D text>\n"
+        "Answer: <Option letter(s)>\n"
+        "Explanation: <A detailed explanation of why the answer(s) is/are correct, including relevant legal principles and citing key documents>\n"
+        "Sources: <List of main sources (document names)>\n\n"
     )
 
     # For MCQs, we do not include additional context when conversation already exists
@@ -146,8 +156,7 @@ def display_mcq(mcq, key, old):
                 "Select your answer:",
                 options=list(mcq.get("options", {}).keys()),
                 format_func=lambda opt: f"{opt}) {mcq['options'][opt]}",
-                disabled=old,
-                index=3
+                disabled=old
             )
         submitted = st.form_submit_button("Submit Answer", on_click=callback_mcq, args=(user_choice,old) ,disabled=old)
         correct_answer = mcq.get("hidden_answer", "").upper()
@@ -166,12 +175,6 @@ def display_mcq(mcq, key, old):
             st.write(mcq.get("hidden_explanation", "No explanation available."))
             st.subheader("Sources")
             st.write(mcq.get("hidden_sources", "No sources available."))
-            #st.subheader("Result")
-            #
-            #st.subheader("Explanation")
-            #st.write(mcq.get("hidden_explanation", "No explanation available."))
-            #st.subheader("Sources")
-            #st.write(mcq.get("hidden_sources", "No sources available."))
     return 
 
 def display_conversations():

@@ -5,7 +5,7 @@ from utils.chunks import load_index_and_chunks, retrieve_chunks
 from utils.repair_pdf import repair_pdf
 from utils.preprocess import process_pdf_to_json, process_html_to_json
 from utils.faiss_index import update_index
-from utils.rag import rag_stream
+from utils.rag import rag_stream, rag
 from dotenv import load_dotenv
 import re
 import os
@@ -52,7 +52,7 @@ def get_context(query, dict_chunks, embedding_model):
         [f"[PDF: {chunk['pdf']} - Page: {chunk['page']}] {chunk['text']}" for chunk in retrieved_chunks]
     )
 
-def rag_generic(model_id, client_inference, query, dict_chunks, system_prompt, include_context_on_history=True):
+def rag_generic(model_id, client_inference, query, dict_chunks, system_prompt, include_context_on_history=True, streaming=True):
     context = get_context(query, dict_chunks, embedding_model)
     if not st.session_state.model_conv_history:
         st.session_state.model_conv_history.append({
@@ -70,13 +70,16 @@ def rag_generic(model_id, client_inference, query, dict_chunks, system_prompt, i
         st.session_state.model_conv_history.append({"role": "user", "content": query})
     
     # Get the response in streaming mode using the generator
-    response_generator = rag_stream(model_id, client_inference, st.session_state.model_conv_history)
-    st.markdown(f"**User**: {query}")
-    placeholder = st.empty()  # This placeholder is updated in real time
-    full_response = ""
-    for token in response_generator:
-        full_response = token  # token contains the accumulation of the response
-        placeholder.markdown("**Model**: " + full_response)
+    if streaming:
+        response_generator = rag_stream(model_id, client_inference, st.session_state.model_conv_history)
+        st.markdown(f"**User**: {query}")
+        placeholder = st.empty()  # This placeholder is updated in real time
+        full_response = ""
+        for token in response_generator:
+            full_response = token  # token contains the accumulation of the response
+            placeholder.markdown("**Model**: " + full_response)
+    else :
+        full_response = rag(model_id, client_inference, st.session_state.model_conv_history)
 
     st.session_state.model_conv_history.append({"role": "assistant", "content": full_response})
     
@@ -108,21 +111,48 @@ def rag_MCQ(model_id, client_inference, query, dict_chunks):
     )
 
     # For MCQs, we do not include additional context when conversation already exists
-    return rag_generic(model_id, client_inference, query, dict_chunks, prompt, include_context_on_history=False)
+    return rag_generic(model_id, client_inference, query, dict_chunks, prompt, include_context_on_history=False, streaming=False)
 
-def display_mcq(mcq, key):
+def callback_mcq(user_choice, old):
+    if not old:
+        st.session_state[f"{st.session_state.nb_mcq}"] = user_choice
+        st.write(user_choice)
+        st.session_state.nb_mcq += 1
+    
+
+def display_mcq(mcq, key, old):
     st.write("### MCQ:")
     st.markdown(f"**Question:** {mcq.get('question', 'No question provided')}")
-    with st.form(key):
-        user_choice = st.radio(
-            "Select your answer:",
-            options=list(mcq.get("options", {}).keys()),
-            format_func=lambda opt: f"{opt}) {mcq['options'][opt]}"
-        )
-        submitted = st.form_submit_button("Submit Answer")
-        if submitted:
-            correct_answer = mcq.get("hidden_answer", "").upper()
-            if user_choice.upper() == correct_answer:
+    
+    with st.form(key=f"mcq_form_" + key):
+        if old :
+            if st.session_state[f"{st.session_state.nb_mcq-1}"] == "A":
+                index = 0
+            elif st.session_state[f"{st.session_state.nb_mcq-1}"] == "B":
+                index = 1
+            elif st.session_state[f"{st.session_state.nb_mcq-1}"] == "C":
+                index = 2
+            else: 
+                index = 3
+            user_choice = st.radio(
+                "Select your answer:",
+                options=list(mcq.get("options", {}).keys()),
+                format_func=lambda opt: f"{opt}) {mcq['options'][opt]}",
+                disabled=old,
+                index=index
+            )
+        else:
+            user_choice = st.radio(
+                "Select your answer:",
+                options=list(mcq.get("options", {}).keys()),
+                format_func=lambda opt: f"{opt}) {mcq['options'][opt]}",
+                disabled=old,
+                index=3
+            )
+        submitted = st.form_submit_button("Submit Answer", on_click=callback_mcq, args=(user_choice,old) ,disabled=old)
+        correct_answer = mcq.get("hidden_answer", "").upper()
+        if old: 
+            if st.session_state[f"{st.session_state.nb_mcq-1}"].upper() == correct_answer[0]:
                 result_text = "Correct Answer!"
             else:
                 result_text = "Incorrect Answer."
@@ -131,16 +161,23 @@ def display_mcq(mcq, key):
                 st.success(result_text)
             else:
                 st.error(result_text)
+            st.write(mcq.get("hidden_answer", ""))
             st.subheader("Explanation")
             st.write(mcq.get("hidden_explanation", "No explanation available."))
             st.subheader("Sources")
             st.write(mcq.get("hidden_sources", "No sources available."))
+            #st.subheader("Result")
+            #
+            #st.subheader("Explanation")
+            #st.write(mcq.get("hidden_explanation", "No explanation available."))
+            #st.subheader("Sources")
+            #st.write(mcq.get("hidden_sources", "No sources available."))
     return 
 
 def display_conversations():
     for i in range(len(st.session_state.interface_conv_history)):
         if st.session_state.RAG_type == "MCQ":
-            display_mcq(st.session_state.interface_conv_history[i]['model'], str(i))
+            display_mcq(st.session_state.interface_conv_history[i]['model'], f"{i}", True)
         else :    
             st.markdown(f"**User**: {st.session_state.interface_conv_history[i]['user']}")
             st.markdown(f"**Model**: {st.session_state.interface_conv_history[i]['model']}")
@@ -175,6 +212,10 @@ def init_session_states():
     # For now only to change the RAG's language output
     if 'language_choice' not in st.session_state:
         st.session_state.language_choice = "English"
+    if 'mcq_choice' not in st.session_state:
+        st.session_state.mcq_choice = []
+    if 'nb_mcq' not in st.session_state:
+        st.session_state.nb_mcq = 0
 
 def update_faiss_and_chunks():
     st.write("Updating the FAISS index with the new data...")
@@ -373,7 +414,7 @@ if st.session_state.input:
         st.session_state.mcq = parse_mcq(st.session_state.mcq_result)
         # Use the stored MCQ to build the UI (with a consistent form key)
         model_response = st.session_state.mcq
-        display_mcq(st.session_state.mcq, "mqc_form")
+        display_mcq(st.session_state.mcq, "mcq_form", False)
     else:
         # For other RAG types (open or create questions)
         model_response = rag_model(st.session_state.model_id, client_inference, user_query, dict_chunks)
